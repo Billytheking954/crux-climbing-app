@@ -1,0 +1,61 @@
+name: Build CRUX IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "validation/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crux-ios-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build unsigned iPhone IPA
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+    steps:
+      - name: Check out CRUX
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Check Apple tooling
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          pod --version
+      - name: Build Release app and package IPA
+        run: npm run build:ios:ipa
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: CRUX_GYM_READY_UNSIGNED
+          path: |
+            build/CRUX_GYM_READY.ipa
+            build/CRUX_GYM_READY.ipa.sha256
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload build log and native dependency lock
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CRUX_BUILD_DIAGNOSTICS
+          path: |
+            build/xcodebuild-release.log
+            ios/Podfile.lock
+          if-no-files-found: ignore
+          retention-days: 7
