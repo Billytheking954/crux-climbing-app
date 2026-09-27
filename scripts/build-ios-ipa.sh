@@ -39,7 +39,9 @@ app_path="$PWD/build/native/Build/Products/Release-iphoneos/CRUX.app"
 [[ -s "$app_path/main.jsbundle" ]] || { echo 'Embedded Release JavaScript bundle missing.' >&2; exit 1; }
 platform="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleSupportedPlatforms:0' "$app_path/Info.plist")"
 [[ "$platform" == iPhoneOS ]] || { echo 'Refusing to package a non-device app.' >&2; exit 1; }
-xcrun lipo -verify_arch arm64 "$app_path/CRUX"
+xcrun lipo "$app_path/CRUX" -verify_arch arm64
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_path/Info.plist")" == com.joshua.crux ]] || { echo 'Unexpected bundle identifier.' >&2; exit 1; }
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app_path/Info.plist")" == CRUX ]] || { echo 'Unexpected executable.' >&2; exit 1; }
 staging="$(mktemp -d "$PWD/build/ipa.XXXXXX")"
 trap 'rm -rf "$staging"' EXIT
 mkdir -p "$staging/Payload"
@@ -48,6 +50,9 @@ output_ipa="$PWD/build/CRUX_GYM_READY.ipa"
 (cd "$staging" && /usr/bin/zip -qry "$staging/CRUX_GYM_READY.ipa" Payload)
 mv "$staging/CRUX_GYM_READY.ipa" "$output_ipa"
 unzip -tq build/CRUX_GYM_READY.ipa
+unzip -Z1 build/CRUX_GYM_READY.ipa | grep -qx 'Payload/CRUX.app/Info.plist'
+unzip -Z1 build/CRUX_GYM_READY.ipa | grep -qx 'Payload/CRUX.app/CRUX'
+unzip -Z1 build/CRUX_GYM_READY.ipa | grep -qx 'Payload/CRUX.app/main.jsbundle'
 shasum -a 256 build/CRUX_GYM_READY.ipa > build/CRUX_GYM_READY.ipa.sha256
 printf '\nCreated build/CRUX_GYM_READY.ipa (UNSIGNED; requires installer resigning).\n'
 printf 'Device installation and offline smoke tests must pass before declaring gym ready.\n'
