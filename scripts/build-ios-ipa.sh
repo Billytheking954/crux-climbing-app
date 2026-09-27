@@ -50,9 +50,10 @@ output_ipa="$PWD/build/CRUX_GYM_READY.ipa"
 (cd "$staging" && /usr/bin/zip -qry "$staging/CRUX_GYM_READY.ipa" Payload)
 mv "$staging/CRUX_GYM_READY.ipa" "$output_ipa"
 unzip -tq build/CRUX_GYM_READY.ipa
-unzip -Z1 build/CRUX_GYM_READY.ipa | grep -qx 'Payload/CRUX.app/Info.plist'
-unzip -Z1 build/CRUX_GYM_READY.ipa | grep -qx 'Payload/CRUX.app/CRUX'
-unzip -Z1 build/CRUX_GYM_READY.ipa | grep -qx 'Payload/CRUX.app/main.jsbundle'
+unzip -Z1 build/CRUX_GYM_READY.ipa > build/ipa-entries.txt
+grep -Fxq 'Payload/CRUX.app/Info.plist' build/ipa-entries.txt
+grep -Fxq 'Payload/CRUX.app/CRUX' build/ipa-entries.txt
+grep -Fxq 'Payload/CRUX.app/main.jsbundle' build/ipa-entries.txt
 shasum -a 256 build/CRUX_GYM_READY.ipa > build/CRUX_GYM_READY.ipa.sha256
 printf '\nCreated build/CRUX_GYM_READY.ipa (UNSIGNED; requires installer resigning).\n'
 printf 'Device installation and offline smoke tests must pass before declaring gym ready.\n'
