@@ -43,12 +43,12 @@ jobs:
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: CRUX_GYM_READY_UNSIGNED
+          name: CRUX-iPhone-Unsigned-1.0.1-${{ github.sha }}
           path: |
             build/CRUX_GYM_READY.ipa
             build/CRUX_GYM_READY.ipa.sha256
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 30
       - name: Upload build log and native dependency lock
         if: always()
         uses: actions/upload-artifact@v4
