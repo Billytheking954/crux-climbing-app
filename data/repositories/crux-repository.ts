@@ -1,5 +1,6 @@
 import { calculateClimbingStats, getHighestGrade } from '@/domain/stats';
 import { gradeToNumber, normalizeVGradeInput } from '@/domain/grades';
+import { normalizeFrenchGrade, validateRouteInput } from '@/domain/rope';
 import {
   validateBoulderInput,
   validateGoal,
@@ -19,6 +20,7 @@ import type {
   ProjectMilestone,
   ProjectPhoto,
   ProjectStatus,
+  RouteClimb,
 } from '@/domain/models';
 import {
   projectHasCompletionEvidence,
@@ -39,6 +41,19 @@ export type BoulderInput = {
   holdType?: string | string[];
   movementType?: string | string[];
 };
+
+export type RouteInput = Pick<RouteClimb, 'discipline' | 'grade' | 'result' | 'attempts' | 'name' | 'notes'>;
+
+function normalizeRouteInput(input: RouteInput): RouteInput {
+  const grade = normalizeFrenchGrade(input.grade);
+  if (!grade) throw new Error('Route grade must use the French scale.');
+  const normalized: RouteInput = {
+    discipline: input.discipline, grade, result: input.result, attempts: input.attempts,
+    name: optionalString(input.name), notes: optionalString(input.notes),
+  };
+  validateRouteInput(normalized);
+  return normalized;
+}
 
 function optionalString(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
@@ -118,11 +133,54 @@ export class CruxRepository {
         gymName: gymName.trim() || 'Unknown Gym',
         startedAt: new Date().toISOString(),
         boulders: [],
+        routes: [],
       };
       snapshot.sessions.unshift(session);
       await this.schema.writeSnapshot(snapshot, new Set(['sessions']));
       return session;
     }, 'session:create');
+  }
+
+  async addRouteToSession(sessionId: string, input: RouteInput): Promise<RouteClimb> {
+    const normalized = normalizeRouteInput(input);
+    return this.mutations.run(async () => {
+      const snapshot = await this.getSnapshot();
+      const session = snapshot.sessions.find((item) => item.id === sessionId);
+      if (!session) throw new Error('Session not found.');
+      if (session.finishedAt) throw new Error('Cannot add a route to a finished session.');
+      const route: RouteClimb = {
+        ...normalized, id: createId('route'), sessionId, createdAt: new Date().toISOString(),
+      };
+      session.routes.push(route);
+      await this.schema.writeSnapshot(snapshot, new Set(['sessions']));
+      return route;
+    }, 'route:add');
+  }
+
+  async updateRoute(sessionId: string, routeId: string, input: RouteInput): Promise<RouteClimb> {
+    const normalized = normalizeRouteInput(input);
+    return this.mutations.run(async () => {
+      const snapshot = await this.getSnapshot();
+      const session = snapshot.sessions.find((item) => item.id === sessionId);
+      if (!session) throw new Error('Session not found.');
+      const index = session.routes.findIndex((item) => item.id === routeId);
+      if (index < 0) throw new Error('Route not found.');
+      const route = { ...session.routes[index], ...normalized };
+      session.routes[index] = route;
+      await this.schema.writeSnapshot(snapshot, new Set(['sessions']));
+      return route;
+    }, 'route:update');
+  }
+
+  async deleteRoute(sessionId: string, routeId: string): Promise<void> {
+    await this.mutations.run(async () => {
+      const snapshot = await this.getSnapshot();
+      const session = snapshot.sessions.find((item) => item.id === sessionId);
+      if (!session) throw new Error('Session not found.');
+      if (!session.routes.some((item) => item.id === routeId)) throw new Error('Route not found.');
+      session.routes = session.routes.filter((item) => item.id !== routeId);
+      await this.schema.writeSnapshot(snapshot, new Set(['sessions']));
+    }, 'route:delete');
   }
 
   async addBoulderToSession(sessionId: string, input: BoulderInput): Promise<Boulder> {
@@ -224,7 +282,7 @@ export class CruxRepository {
       const session = snapshot.sessions.find((item) => item.id === sessionId);
       if (!session) throw new Error('Session not found.');
       if (session.finishedAt) return;
-      const latest = session.boulders.reduce((time, boulder) => Math.max(time, new Date(boulder.createdAt).getTime()), new Date(session.startedAt).getTime());
+      const latest = [...session.boulders, ...session.routes].reduce((time, climb) => Math.max(time, new Date(climb.createdAt).getTime()), new Date(session.startedAt).getTime());
       session.finishedAt = new Date(Math.max(Date.now(), latest)).toISOString();
       await this.schema.writeSnapshot(snapshot, new Set(['sessions']));
     }, 'session:finish');
