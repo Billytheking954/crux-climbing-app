@@ -51,6 +51,7 @@ import {
   type ClimbingGoal,
   type ClimbingSession,
 } from '@/data/storage';
+import { clampGoalCompletionDateToCreation } from '@/domain/goal-completion';
 
 import {
   confirmAction,
@@ -231,7 +232,7 @@ function getGoalCompletionDate(
         cumulativeSessions,
       ).complete
     ) {
-      return session.finishedAt;
+      return clampGoalCompletionDateToCreation(goal.createdAt, session.finishedAt!);
     }
   }
 
