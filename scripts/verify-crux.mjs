@@ -14,7 +14,7 @@ requireCondition(exists('app/developer-diagnostics.tsx'), 'Developer Diagnostics
 requireCondition(read('app/developer-diagnostics.tsx').includes('Run Full Lifecycle Test'), 'Developer Diagnostics must expose the lifecycle test button');
 requireCondition(read('app/(tabs)/settings.tsx').includes("router.push('/developer-diagnostics')"), 'Settings must link to Developer Diagnostics');
 
-requireCondition(read('data/persistence/storage-keys.ts').includes('CURRENT_STORAGE_SCHEMA_VERSION = 8'), 'Storage schema must be v8');
+requireCondition(read('data/persistence/storage-keys.ts').includes('CURRENT_STORAGE_SCHEMA_VERSION = 9'), 'Storage schema must be v9');
 requireCondition(read('data/persistence/storage-keys.ts').includes('crux_storage_backup_before_v8'), 'Schema v8 migration backup is missing');
 requireCondition(read('data/persistence/schema.ts').includes('crux_storage_recovery_snapshot') || read('data/persistence/storage-keys.ts').includes('crux_storage_recovery_snapshot'), 'Recovery snapshot support is missing');
 requireCondition(read('data/repositories/crux-repository.ts').includes('MutationSerializationQueue'), 'Repository must use the serialized save queue');
