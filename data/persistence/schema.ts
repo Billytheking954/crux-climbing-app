@@ -2,6 +2,7 @@ import { MutationSerializationQueue } from './mutation-queue';
 import { recoverInterruptedWrite, writeTransaction } from './transaction';
 import { logger } from '@/core/logging/logger';
 import { normalizeVGradeInput } from '@/domain/grades';
+import { normalizeFrenchGrade, validateRouteInput } from '@/domain/rope';
 import {
   MAX_SUPPORTED_V_GRADE,
   assertSnapshotIntegrity,
@@ -10,7 +11,7 @@ import {
   isValidDateString,
   resultSupportsProjectLink,
 } from '@/domain/invariants';
-import type { Boulder, ClimbingGoal, ClimbingProject, ClimbingSession, CruxSnapshot, ProjectMilestone, ProjectPhoto } from '@/domain/models';
+import type { Boulder, ClimbingGoal, ClimbingProject, ClimbingSession, CruxSnapshot, ProjectMilestone, ProjectPhoto, RouteClimb, RouteDiscipline, RouteResult } from '@/domain/models';
 import { projectCompletionStateMatchesSessions, reconcileProjectsWithSessions, sanitizeSessionProjectLinks } from '@/domain/project-reconciliation';
 import type { StorageEngine } from './storage-engine';
 import { StorageDataError } from './storage-errors';
@@ -55,6 +56,25 @@ function normalizeBoulder(value: unknown, sessionId: string, startedAt: string, 
   };
 }
 
+function normalizeRoute(value: unknown, sessionId: string, startedAt: string, finishedAt?: string): RouteClimb | null {
+  if (!isRecord(value) || typeof value.id !== 'string' || !value.id.trim() || typeof value.grade !== 'string' ||
+      typeof value.result !== 'string' || typeof value.attempts !== 'number' ||
+      (value.discipline !== 'top-rope' && value.discipline !== 'lead') ||
+      !isValidDateString(value.createdAt)) return null;
+  const discipline = value.discipline as RouteDiscipline;
+  const result = value.result as RouteResult;
+  const grade = normalizeFrenchGrade(value.grade);
+  if (!grade) return null;
+  const createdAt = value.createdAt;
+  const time = new Date(createdAt).getTime();
+  if (time < new Date(startedAt).getTime() || (finishedAt && time > new Date(finishedAt).getTime())) return null;
+  try { validateRouteInput({ discipline, grade, result, attempts: value.attempts }); } catch { return null; }
+  return {
+    id: value.id, sessionId, discipline, grade, result, attempts: value.attempts,
+    name: clean(value.name), notes: clean(value.notes), createdAt,
+  };
+}
+
 function normalizeSession(value: unknown, index: number): ClimbingSession | null {
   if (!isRecord(value) || !isValidDateString(value.startedAt)) return null;
   const startedAt = value.startedAt;
@@ -71,7 +91,15 @@ function normalizeSession(value: unknown, index: number): ClimbingSession | null
     if (!boulder) return null;
     boulders.push(boulder);
   }
-  return { id, gymName: clean(value.gymName) ?? 'Unknown Gym', startedAt, finishedAt, boulders };
+  // Prior schema versions contain no routes. A malformed routes array, however, must not be silently discarded.
+  if (value.routes !== undefined && !Array.isArray(value.routes)) return null;
+  const routes: RouteClimb[] = [];
+  for (const rawRoute of (value.routes as unknown[] | undefined) ?? []) {
+    const route = normalizeRoute(rawRoute, id, startedAt, finishedAt);
+    if (!route) return null;
+    routes.push(route);
+  }
+  return { id, gymName: clean(value.gymName) ?? 'Unknown Gym', startedAt, finishedAt, boulders, routes };
 }
 
 function repairExtraActiveSessions(sessions: ClimbingSession[]): ClimbingSession[] {
@@ -233,7 +261,8 @@ export class StorageSchemaManager {
     if (version < 5) await backup(this.engine, StorageKeys.backupV5, version, raw);
     if (version < 6) await backup(this.engine, StorageKeys.backupV6, version, raw);
     if (version < 7) await backup(this.engine, StorageKeys.backupV7, version, raw);
-    await backup(this.engine, StorageKeys.backupV8, version, raw);
+    if (version < 8) await backup(this.engine, StorageKeys.backupV8, version, raw);
+    await backup(this.engine, StorageKeys.backupV9, version, raw);
     const sessions = parseArray(raw.sessions); const goals = parseArray(raw.goals); const projects = parseArray(raw.projects);
     if (!sessions || !goals || !projects) throw new StorageDataError('MIGRATION_FAILED', 'Existing CRUX data could not be parsed safely. The original data was preserved.');
     const snapshot = normalizeSnapshot({ sessions, goals, projects }, true);
