@@ -1,6 +1,6 @@
 import { StorageDataError } from '@/data/persistence/storage-errors';
 import { cruxRepository } from '@/data/repositories';
-import type { BoulderInput } from '@/data/repositories/crux-repository';
+import type { BoulderInput, RouteInput } from '@/data/repositories/crux-repository';
 import { gradeToNumber, calculateClimbingStats, getHighestGrade } from '@/data/repositories/crux-repository';
 import type {
   Boulder,
@@ -14,15 +14,21 @@ import type {
   ProjectMilestone,
   ProjectPhoto,
   ProjectStatus,
+  RouteClimb,
+  RouteDiscipline,
+  RouteResult,
 } from '@/domain/models';
 
-export type { Boulder, BoulderResult, ClimbingGoal, ClimbingProject, ClimbingSession, ClimbingStats, GoalType, ProjectCompletionSource, ProjectMilestone, ProjectPhoto, ProjectStatus };
+export type { Boulder, BoulderResult, ClimbingGoal, ClimbingProject, ClimbingSession, ClimbingStats, GoalType, ProjectCompletionSource, ProjectMilestone, ProjectPhoto, ProjectStatus, RouteClimb, RouteDiscipline, RouteResult };
 export { StorageDataError, gradeToNumber, calculateClimbingStats, getHighestGrade };
 
 export const getCruxSnapshot = () => cruxRepository.getSnapshot();
 export const resetStorageRuntimeState = () => cruxRepository.resetRuntimeState();
 export const getSessions = () => cruxRepository.getSessions();
 export const createSession = (gymName: string, options?: { requireNew?: boolean }) => cruxRepository.createSession(gymName, options);
+export const addRouteToSession = (sessionId: string, input: RouteInput) => cruxRepository.addRouteToSession(sessionId, input);
+export const updateRoute = (sessionId: string, routeId: string, input: RouteInput) => cruxRepository.updateRoute(sessionId, routeId, input);
+export const deleteRoute = (sessionId: string, routeId: string) => cruxRepository.deleteRoute(sessionId, routeId);
 export const addBoulderToSession = (sessionId: string, input: BoulderInput) => cruxRepository.addBoulderToSession(sessionId, input);
 export const updateBoulder = (sessionId: string, boulderId: string, input: BoulderInput) => cruxRepository.updateBoulder(sessionId, boulderId, input);
 export const deleteBoulder = (sessionId: string, boulderId: string) => cruxRepository.deleteBoulder(sessionId, boulderId);
