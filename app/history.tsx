@@ -128,7 +128,7 @@ function getSessionStats(
         total +
         boulder.attempts,
       0,
-    );
+    ) + routes.reduce((sum, route) => sum + route.attempts, 0);
 
   return {
     boulders:
