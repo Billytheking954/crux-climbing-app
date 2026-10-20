@@ -35,6 +35,8 @@ import {
   Typography,
 } from '@/constants/theme';
 
+import { highestRouteGrade } from '@/domain/rope';
+
 import {
   calculateClimbingStats,
   getHighestGrade,
@@ -322,6 +324,13 @@ export default function StatsScreen() {
       [finishedSessions],
     );
 
+  const allRoutes = useMemo(
+    () => finishedSessions.flatMap((session) => session.routes),
+    [finishedSessions],
+  );
+  const topRope = allRoutes.filter((route) => route.discipline === 'top-rope');
+  const lead = allRoutes.filter((route) => route.discipline === 'lead');
+
   const weeklySessions =
     useMemo(
       () =>
@@ -590,6 +599,16 @@ export default function StatsScreen() {
                     last
                   />
                 </View>
+              </View>
+
+              <SectionHeader title="Rope climbing" scheme={scheme} />
+              <View style={styles.resultTable}>
+                <DataRow label="Top-rope routes" value={topRope.length} />
+                <DataRow label="Lead routes" value={lead.length} />
+                <DataRow label="Clean top-ropes" value={topRope.filter((route) => route.result === 'Clean').length} />
+                <DataRow label="Successful leads" value={lead.filter((route) => route.result !== 'Attempt').length} />
+                <DataRow label="Hardest top-rope (French)" value={highestRouteGrade(allRoutes, 'top-rope') ?? '—'} />
+                <DataRow label="Hardest lead (French)" value={highestRouteGrade(allRoutes, 'lead') ?? '—'} last />
               </View>
 
               <SectionHeader
