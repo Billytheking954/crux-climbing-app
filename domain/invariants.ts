@@ -1,4 +1,5 @@
 import { isSupportedVGradeValue } from './grades';
+import { validateRouteInput } from './rope';
 import type { BoulderResult, ClimbingGoal, ClimbingProject, ClimbingSession, GoalType, ProjectPhoto } from './models';
 
 export const MAX_SUPPORTED_V_GRADE = 17;
@@ -50,7 +51,7 @@ export function validateSessionUpdate(
   const start = new Date(update.startedAt).getTime();
   const finish = update.finishedAt ? new Date(update.finishedAt).getTime() : undefined;
   if (finish !== undefined && finish < start) throw new Error('Session finish time cannot be before the start time.');
-  for (const boulder of current.boulders) {
+  for (const boulder of [...current.boulders, ...current.routes]) {
     const at = new Date(boulder.createdAt).getTime();
     if (at < start) throw new Error('Session start time cannot be after a boulder that was logged in this session.');
     if (finish !== undefined && at > finish) throw new Error('Session finish time cannot be before a boulder that was logged in this session.');
@@ -107,12 +108,19 @@ export function assertSnapshotIntegrity(sessions: ClimbingSession[], goals: Clim
   assertUniqueIds(projects, 'project');
   const boulders = sessions.flatMap((session) => session.boulders);
   assertUniqueIds(boulders, 'boulder');
+  assertUniqueIds(sessions.flatMap((session) => session.routes), 'route');
   if (sessions.filter((session) => !session.finishedAt).length > 1) throw new Error('More than one active session exists.');
   const projectIds = new Set(projects.map((project) => project.id));
   for (const session of sessions) {
     const start = new Date(session.startedAt).getTime();
     const finish = session.finishedAt ? new Date(session.finishedAt).getTime() : undefined;
     if (finish !== undefined && finish < start) throw new Error(`Session ${session.id} finishes before it starts.`);
+    for (const route of session.routes) {
+      if (route.sessionId !== session.id) throw new Error(`Route ${route.id} has an invalid session link.`);
+      const at = new Date(route.createdAt).getTime();
+      if (!Number.isFinite(at) || at < start || (finish !== undefined && at > finish)) throw new Error(`Route ${route.id} falls outside its session timeline.`);
+      validateRouteInput(route);
+    }
     for (const boulder of session.boulders) {
       if (boulder.sessionId !== session.id) throw new Error(`Boulder ${boulder.id} has an invalid session link.`);
       const at = new Date(boulder.createdAt).getTime();
