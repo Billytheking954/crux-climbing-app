@@ -58,6 +58,28 @@ async function testGradeAndInvariantRules() {
   assert(rejected, 'Send with one attempt must be rejected.');
 }
 
+async function testGoalCompletionTimeline() {
+  const { clampGoalCompletionDateToCreation } = require('../domain/goal-completion.ts');
+  const { CruxRepository } = require('../data/repositories/crux-repository.ts');
+  const createdAt = '2026-10-01T12:00:00.000Z';
+  const reachedEarlier = '2026-09-01T12:00:00.000Z';
+  const reachedLater = '2026-10-02T12:00:00.000Z';
+  assert(clampGoalCompletionDateToCreation(createdAt, reachedEarlier) === createdAt,
+    'An already achieved goal must complete on creation, not before.');
+  assert(clampGoalCompletionDateToCreation(createdAt, reachedLater) === reachedLater,
+    'Goals achieved later must retain their real completion date.');
+  const goals = [{ id: 'goal-timeline', type: 'sessions', title: 'One session', target: 1, createdAt }];
+  const repo = new CruxRepository(createMemoryStorage({
+    crux_storage_schema_version: '8',
+    crux_sessions: '[]',
+    crux_projects: '[]',
+    crux_goals: JSON.stringify(goals),
+  }));
+  await repo.saveGoals([{ ...goals[0], completedAt: clampGoalCompletionDateToCreation(createdAt, reachedEarlier) }]);
+  assert((await repo.getGoals())[0].completedAt === createdAt,
+    'Previously met goals must remain valid and readable after saving.');
+}
+
 async function testSchemaV8Migration() {
   const { CruxRepository } = require(path.join(root, 'data', 'repositories', 'crux-repository.ts'));
   const startedAt = '2026-08-31T18:00:00.000Z';
@@ -290,6 +312,7 @@ async function testPhotoPersistence() {
 
 (async () => {
   await testGradeAndInvariantRules();
+  await testGoalCompletionTimeline();
   await testSchemaV8Migration();
   await testMalformedDataPreserved();
   await testLifecycleAndConcurrency();
@@ -298,7 +321,7 @@ async function testPhotoPersistence() {
     await test();
     console.log(`PASS ${test.name}`);
   }
-  console.log('PASS all 12 CRUX safety suites (native APIs mocked where required).');
+  console.log('PASS all 13 CRUX safety suites (native APIs mocked where required).');
 })().catch((error) => {
   console.error(error.stack || error);
   process.exit(1);
