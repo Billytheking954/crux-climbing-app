@@ -89,7 +89,7 @@ async function testSchemaV9Migration() {
 
 async function testMalformedDataPreserved() {
   const { CruxRepository } = require(path.join(root, 'data', 'repositories', 'crux-repository.ts'));
-  const engine = createMemoryStorage({ crux_storage_schema_version: '8', crux_sessions: '{bad', crux_projects: '[]', crux_goals: '[]' });
+  const engine = createMemoryStorage({ crux_storage_schema_version: '9', crux_sessions: '{bad', crux_projects: '[]', crux_goals: '[]' });
   const repo = new CruxRepository(engine);
   let failed = false;
   try { await repo.createSession('Do not overwrite'); } catch { failed = true; }
