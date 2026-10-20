@@ -44,11 +44,13 @@ import {
   type Boulder,
   type BoulderResult,
   type ClimbingSession,
+  type RouteClimb,
 } from '@/data/storage';
 
 import {
   resolveRouteParam,
 } from '@/utils/climbing';
+import { highestRouteGrade } from '@/domain/rope';
 
 const scheme =
   DefaultCruxScheme;
@@ -368,6 +370,7 @@ export default function SessionDetailsScreen() {
 
   const boulders: Boulder[] =
     session.boulders;
+  const routes: RouteClimb[] = session.routes;
 
   const flashes =
     boulders.filter(
@@ -406,7 +409,7 @@ export default function SessionDetailsScreen() {
         total +
         boulder.attempts,
       0,
-    );
+    ) + routes.reduce((total, route) => total + route.attempts, 0);
 
   const highestGrade =
     getHighestGrade(
@@ -674,6 +677,10 @@ export default function SessionDetailsScreen() {
                 projects,
               )}
             />
+            <DetailRow label="Top-rope routes" value={String(routes.filter((route) => route.discipline === 'top-rope').length)} />
+            <DetailRow label="Lead routes" value={String(routes.filter((route) => route.discipline === 'lead').length)} />
+            <DetailRow label="Hardest top-rope" value={highestRouteGrade(routes, 'top-rope') ?? '—'} />
+            <DetailRow label="Hardest lead" value={highestRouteGrade(routes, 'lead') ?? '—'} />
           </View>
 
           <View
@@ -720,7 +727,7 @@ export default function SessionDetailsScreen() {
                   styles.emptyText
                 }
               >
-                This session was saved without any logged climbs.
+                No boulders were logged in this session.
               </Text>
             </View>
           ) : (
@@ -854,6 +861,33 @@ export default function SessionDetailsScreen() {
               )}
             </View>
           )}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Top-rope and lead routes</Text>
+            <Text style={styles.sectionCount}>{routes.length}</Text>
+          </View>
+          {routes.length > 0 ? (
+            <View style={styles.climbList}>
+              {routes.map((route) => (
+                <Pressable
+                  key={route.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit ${route.discipline} route ${route.name ?? route.grade}`}
+                  onPress={() => router.push({
+                    pathname: '/route-climb',
+                    params: { sessionId: session.id, routeId: route.id },
+                  })}
+                  style={styles.climbRow}
+                >
+                  <GradeBadge grade={route.grade} system="french" scheme={scheme} tone={route.result === 'Attempt' ? 'neutral' : 'success'} />
+                  <View style={styles.climbDetails}>
+                    <Text style={styles.climbName}>{route.name ?? (route.discipline === 'lead' ? 'Lead' : 'Top-rope')}</Text>
+                    <Text style={styles.climbPrimaryMeta}>{route.discipline === 'lead' ? 'Lead' : 'Top-rope'} · {route.result} · {route.attempts} {route.attempts === 1 ? 'attempt' : 'attempts'}</Text>
+                    {route.notes ? <Text style={styles.climbSecondaryMeta}>{route.notes}</Text> : null}
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>
