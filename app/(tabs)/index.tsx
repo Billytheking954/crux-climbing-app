@@ -336,7 +336,7 @@ function ActiveSessionCard({
             )}
             {' · '}
             {session.boulders.length}{' '}
-            boulders
+            boulders{' · '}{session.routes.length} routes
             {' · '}
             {getAttempts(
               session,
@@ -446,7 +446,7 @@ function RecentSessionRow({
           }
         >
           {session.boulders.length}{' '}
-          boulders
+          boulders{' · '}{session.routes.length} routes
           {' · '}
           {getAttempts(
             session,
