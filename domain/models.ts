@@ -1,3 +1,18 @@
+export type RouteDiscipline = 'top-rope' | 'lead';
+export type RouteResult = 'Clean' | 'Onsight' | 'Flash' | 'Redpoint' | 'Attempt';
+
+export type RouteClimb = {
+  id: string;
+  sessionId: string;
+  discipline: RouteDiscipline;
+  name?: string;
+  grade: string;
+  result: RouteResult;
+  attempts: number;
+  notes?: string;
+  createdAt: string;
+};
+
 export type BoulderResult = 'Flash' | 'Send' | 'Attempt' | 'Project' | 'Completed';
 
 export type Boulder = {
@@ -20,6 +35,7 @@ export type ClimbingSession = {
   startedAt: string;
   finishedAt?: string;
   boulders: Boulder[];
+  routes: RouteClimb[];
 };
 
 export type ClimbingStats = {
