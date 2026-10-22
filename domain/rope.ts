@@ -2,7 +2,7 @@ import type { RouteDiscipline, RouteResult } from './models';
 
 // French sport grades. Kept separate from the V scale: conversion would be misleading.
 export const FRENCH_GRADES: string[] = [
-  '3', '3+',
+  '3', '3+', '4',
   ...Array.from({ length: 6 }, (_, offset) => offset + 4)
     .flatMap((n) => ['a', 'b', 'c'].flatMap((letter) => [`${n}${letter}`, `${n}${letter}+`])),
 ];
