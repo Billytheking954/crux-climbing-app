@@ -2,10 +2,8 @@ name: Build CRUX IPA
 
 on:
   workflow_dispatch:
-  pull_request:
-    branches: [main]
   push:
-    branches: [main]
+    branches: [main, feature/rope-climbing-v1]
     paths-ignore:
       - "**.md"
       - "validation/**"
