@@ -271,9 +271,13 @@ async function testRopeClimbing() {
   assert(engine._store.get('crux_storage_schema_version') === '9', 'Schema v8 must safely upgrade to v9.');
   assert(engine._store.has('crux_storage_backup_before_v9'), 'A v8 backup must be saved before migration.');
   assert(session.routes.length === 0, 'Migrated sessions must have an empty routes collection.');
+  assert(normalizeFrenchGrade('4') === '4', 'Standalone French grade 4 must be supported.');
   assert(normalizeFrenchGrade(' 6A+ ') === '6a+' && normalizeFrenchGrade('V4') === null, 'French grades must be distinct from V grades.');
 
   const boulder = await repo.addBoulderToSession(session.id, { grade: 'V3', result: 'Flash', attempts: 1 });
+  const grade4 = await repo.addRouteToSession(session.id, { discipline: 'lead', grade: '4', result: 'Attempt', attempts: 1 });
+  assert(grade4.grade === '4', 'A grade 4 route must be accepted and persisted.');
+  await repo.deleteRoute(session.id, grade4.id);
   const tr = await repo.addRouteToSession(session.id, { discipline: 'top-rope', grade: '5c', result: 'Clean', attempts: 1, name: 'Blue wall' });
   const lead = await repo.addRouteToSession(session.id, { discipline: 'lead', grade: '6a+', result: 'Redpoint', attempts: 3, notes: 'Rest at second bolt' });
   assert((await repo.getSessionById(session.id)).routes.length === 2, 'Top-rope and lead must persist in one session.');
