@@ -40,6 +40,8 @@ jobs:
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
           pod --version
+      - name: Build Release app and package IPA
+        run: npm run build:ios:ipa
       - name: Run iPhone Simulator launch stress
         shell: bash
         run: |
@@ -76,8 +78,6 @@ jobs:
             xcrun simctl spawn "$simulator_udid" kill -0 "$simulator_pid"
             xcrun simctl terminate "$simulator_udid" com.joshua.crux
           done
-      - name: Build Release app and package IPA
-        run: npm run build:ios:ipa
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
