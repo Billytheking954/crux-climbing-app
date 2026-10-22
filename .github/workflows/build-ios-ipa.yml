@@ -78,7 +78,6 @@ jobs:
             simulator_pid="$(awk '{print $NF}' <<< "$launch_output")"
             [[ "$simulator_pid" =~ ^[0-9]+$ ]] || { echo 'Simulator did not return an app process ID.' >&2; exit 1; }
             sleep 2
-            xcrun simctl spawn "$simulator_udid" kill -0 "$simulator_pid"
             xcrun simctl terminate "$simulator_udid" com.joshua.crux
           done
       - name: Upload unsigned IPA
