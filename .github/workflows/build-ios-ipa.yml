@@ -86,7 +86,7 @@ jobs:
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: CRUX-iPhone-Unsigned-1.0.1-\${{ github.sha }}
+          name: CRUX-iPhone-Unsigned-1.0.1
           path: |
             build/CRUX_GYM_READY.ipa
             build/CRUX_GYM_READY.ipa.sha256
