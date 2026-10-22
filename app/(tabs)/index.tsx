@@ -43,6 +43,8 @@ import {
   Typography,
 } from '@/constants/theme';
 
+import { highestRouteGrade } from '@/domain/rope';
+
 import {
   getHighestGrade,
   getSessions,
@@ -121,7 +123,7 @@ function getAttempts(
     (total, boulder) =>
       total + boulder.attempts,
     0,
-  );
+  ) + session.routes.reduce((total, route) => total + route.attempts, 0);
 }
 
 function getSessionsBetween(
@@ -336,7 +338,7 @@ function ActiveSessionCard({
             )}
             {' · '}
             {session.boulders.length}{' '}
-            boulders
+            boulders{' · '}{session.routes.length} routes
             {' · '}
             {getAttempts(
               session,
@@ -380,6 +382,7 @@ function RecentSessionRow({
     getHighestGrade(
       session.boulders,
     );
+  const highestRope = highestRouteGrade(session.routes, 'lead') ?? highestRouteGrade(session.routes, 'top-rope');
 
   return (
     <Pressable
@@ -446,7 +449,7 @@ function RecentSessionRow({
           }
         >
           {session.boulders.length}{' '}
-          boulders
+          boulders{' · '}{session.routes.length} routes
           {' · '}
           {getAttempts(
             session,
@@ -461,9 +464,10 @@ function RecentSessionRow({
 
       <GradeBadge
         grade={
-          highest ?? '—'
+          highest ?? highestRope ?? '—'
         }
         scheme={scheme}
+        system={highest ? 'vscale' : 'french'}
       />
     </Pressable>
   );

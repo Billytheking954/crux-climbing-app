@@ -3,7 +3,7 @@ name: Build CRUX IPA
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, feature/rope-climbing-v1]
     paths-ignore:
       - "**.md"
       - "validation/**"
@@ -40,10 +40,50 @@ jobs:
           pod --version
       - name: Build Release app and package IPA
         run: npm run build:ios:ipa
+      - name: Run iPhone Simulator launch stress
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p build
+          exec > >(tee -a build/simulator-smoke.log) 2>&1
+          xcodebuild \
+            -workspace ios/CRUX.xcworkspace \
+            -scheme CRUX \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$PWD/build/simulator" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' \
+            build | tee build/xcodebuild-simulator.log
+
+          app_path="$PWD/build/simulator/Build/Products/Release-iphonesimulator/CRUX.app"
+          [[ -d "$app_path" ]] || { echo 'Simulator app bundle missing.' >&2; exit 1; }
+          [[ -s "$app_path/main.jsbundle" ]] || { echo 'Simulator JavaScript bundle missing.' >&2; exit 1; }
+
+          simulator_info="$(xcrun simctl list devices available --json | python3 -c 'import json,sys; devices=json.load(sys.stdin)["devices"]; print(next((d["udid"]+"|"+d["state"] for group in devices.values() for d in group if d.get("isAvailable") and d["name"].startswith("iPhone")), ""))')"
+          [[ -n "$simulator_info" ]] || { echo 'No available iPhone simulator found.' >&2; exit 1; }
+          IFS='|' read -r simulator_udid simulator_state <<< "$simulator_info"
+          echo "Using iPhone simulator $simulator_udid (state: $simulator_state)"
+          if [[ "$simulator_state" != "Booted" ]]; then
+            xcrun simctl boot "$simulator_udid"
+          fi
+          xcrun simctl bootstatus "$simulator_udid" -b
+          xcrun simctl install "$simulator_udid" "$app_path"
+          xcrun simctl get_app_container "$simulator_udid" com.joshua.crux app
+
+          for attempt in $(seq 1 10); do
+            echo "Launch/relaunch $attempt of 10"
+            launch_output="$(xcrun simctl launch --terminate-running-process "$simulator_udid" com.joshua.crux)"
+            echo "$launch_output"
+            simulator_pid="$(awk '{print $NF}' <<< "$launch_output")"
+            [[ "$simulator_pid" =~ ^[0-9]+$ ]] || { echo 'Simulator did not return an app process ID.' >&2; exit 1; }
+            sleep 2
+            xcrun simctl terminate "$simulator_udid" com.joshua.crux
+          done
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: CRUX-iPhone-Unsigned-1.0.1-${{ github.sha }}
+          name: CRUX-iPhone-Unsigned-1.0.1
           path: |
             build/CRUX_GYM_READY.ipa
             build/CRUX_GYM_READY.ipa.sha256
@@ -56,6 +96,8 @@ jobs:
           name: CRUX_BUILD_DIAGNOSTICS
           path: |
             build/xcodebuild-release.log
+            build/xcodebuild-simulator.log
+            build/simulator-smoke.log
             ios/Podfile.lock
           if-no-files-found: ignore
           retention-days: 7

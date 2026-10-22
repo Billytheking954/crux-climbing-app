@@ -82,7 +82,7 @@ export default function SettingsScreen() {
           <View style={styles.infoList}>
             <InfoRow title="Local storage" description="Sessions, boulders, projects, goals and settings are stored on this device." />
             <InfoRow title="Migration safety" description="CRUX keeps recovery snapshots and migration backups before changing saved-data formats." />
-            <InfoRow title="Schema" description="This recovered final project uses storage schema v8." />
+            <InfoRow title="Schema" description="This recovered final project uses storage schema v9." />
           </View>
 
           <SectionHeader title="Current logging" scheme={scheme} />

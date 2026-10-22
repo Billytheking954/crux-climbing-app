@@ -42,6 +42,7 @@ import {
   getSessions,
   type Boulder,
   type ClimbingSession,
+  type RouteClimb,
 } from '@/data/storage';
 
 import {
@@ -330,6 +331,16 @@ export default function SessionScreen() {
     });
   };
 
+  const openAddRoute = () => {
+    if (!session) return;
+    router.push({ pathname: '/route-climb', params: { sessionId: session.id } });
+  };
+
+  const openEditRoute = (routeId: string) => {
+    if (!session) return;
+    router.push({ pathname: '/route-climb', params: { sessionId: session.id, routeId } });
+  };
+
   const openEditBoulder = (
     boulderId: string,
   ) => {
@@ -412,6 +423,7 @@ export default function SessionScreen() {
 
   const boulders: Boulder[] =
     session?.boulders ?? [];
+  const routes: RouteClimb[] = session?.routes ?? [];
 
   const flashes =
     boulders.filter(
@@ -436,7 +448,7 @@ export default function SessionScreen() {
         total +
         boulder.attempts,
       0,
-    );
+    ) + routes.reduce((total, route) => total + route.attempts, 0);
 
   return (
     <SafeAreaView
@@ -805,6 +817,39 @@ export default function SessionScreen() {
                 </View>
               )}
 
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Rope routes</Text>
+                <Text style={styles.sectionCount}>{routes.length}</Text>
+              </View>
+              {routes.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyText}>Add a top-rope or lead climb when you are ready.</Text>
+                </View>
+              ) : (
+                <View style={styles.climbList}>
+                  {routes.map((route) => (
+                    <Pressable
+                      key={route.id}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Edit ${route.discipline} route ${route.name ?? route.grade}`}
+                      onPress={() => openEditRoute(route.id)}
+                      style={styles.climbRow}
+                    >
+                      <GradeBadge grade={route.grade} system="french" scheme={scheme} />
+                      <View style={styles.climbDetails}>
+                        <Text numberOfLines={1} style={styles.climbName}>{route.name ?? (route.discipline === 'lead' ? 'Lead' : 'Top-rope')}</Text>
+                        <Text style={styles.climbMeta}>{route.result} · {route.discipline === 'lead' ? 'Lead' : 'Top-rope'}</Text>
+                        {route.notes ? <Text numberOfLines={1} style={styles.climbSecondary}>{route.notes}</Text> : null}
+                      </View>
+                      <View style={styles.attemptColumn}>
+                        <Text style={styles.attemptValue}>{route.attempts}</Text>
+                        <Text style={styles.attemptLabel}>{route.attempts === 1 ? 'attempt' : 'attempts'}</Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
               <View
                 style={
                   styles.actions
@@ -817,6 +862,13 @@ export default function SessionScreen() {
                   onPress={
                     openAddBoulder
                   }
+                />
+
+                <AppButton
+                  label="Add route (top-rope / lead)"
+                  disabled={saving}
+                  scheme={scheme}
+                  onPress={openAddRoute}
                 />
 
                 <AppButton

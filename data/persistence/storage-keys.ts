@@ -9,6 +9,7 @@ export const StorageKeys = {
   backupV6: 'crux_storage_backup_before_v6',
   backupV7: 'crux_storage_backup_before_v7',
   backupV8: 'crux_storage_backup_before_v8',
+  backupV9: 'crux_storage_backup_before_v9',
 } as const;
 
-export const CURRENT_STORAGE_SCHEMA_VERSION = 8;
+export const CURRENT_STORAGE_SCHEMA_VERSION = 9;

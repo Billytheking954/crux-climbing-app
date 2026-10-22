@@ -32,6 +32,8 @@ import {
   Typography,
 } from '@/constants/theme';
 
+import { highestRouteGrade } from '@/domain/rope';
+
 import {
   getHighestGrade,
   getSessions,
@@ -107,6 +109,7 @@ function getSessionStats(
 ) {
   const boulders =
     session.boulders;
+  const routes = session.routes;
 
   const flashes =
     boulders.filter(
@@ -128,11 +131,14 @@ function getSessionStats(
         total +
         boulder.attempts,
       0,
-    );
+    ) + routes.reduce((sum, route) => sum + route.attempts, 0);
 
   return {
     boulders:
       boulders.length,
+    topRope: routes.filter((route) => route.discipline === 'top-rope').length,
+    lead: routes.filter((route) => route.discipline === 'lead').length,
+    highestRope: highestRouteGrade(routes, 'lead') ?? highestRouteGrade(routes, 'top-rope'),
     flashes,
     sends,
     attempts,
@@ -440,6 +446,10 @@ export default function HistoryScreen() {
                           }{' '}
                           boulders
                           {' · '}
+                          {stats.topRope} top-rope
+                          {' · '}
+                          {stats.lead} lead
+                          {' · '}
                           {
                             stats.attempts
                           }{' '}
@@ -478,12 +488,13 @@ export default function HistoryScreen() {
                       >
                         <GradeBadge
                           grade={
-                            stats.highestGrade ??
+                            stats.highestGrade ?? stats.highestRope ??
                             '—'
                           }
                           scheme={
                             scheme
                           }
+                          system={stats.highestGrade ? 'vscale' : 'french'}
                         />
                       </View>
                     </Pressable>

@@ -2,7 +2,9 @@
 
 This is the updated full CRUX source and generated iOS project. **No IPA has been produced. Native compilation and iPhone validation remain pending.** See `RELEASE_REPORT.md` for actual results and limitations. The inherited archive filename is not a release certification.
 
-CRUX remains a local-first bouldering logbook using Expo 54, React Native 0.81.5, Expo Router 6 and strict TypeScript. It supports V grades/ranges, attempts/results, editable sessions/history, projects/photos, goals and diagnostics. Sport/top-rope grades are not supported by this existing app.
+CRUX remains a local-first climbing logbook using Expo 54, React Native 0.81.5, Expo Router 6 and strict TypeScript. It supports V grades/ranges, attempts/results, editable sessions/history, projects/photos, goals and diagnostics. This feature branch adds top-rope and lead route logging using French grades, with saved routes inside sessions. Existing bouldering goals and projects remain bouldering-specific.
+
+**Build distinction:** The successful September 2026 unsigned IPA from `main` predates the rope-climbing feature. A new native build is required after merging this feature branch. The older release report reflects its original build date.
 
 ## Windows
 
@@ -41,6 +43,6 @@ After a successful build and installation, use `DEVICE_CHECKLIST.md`. Check offl
 
 ## Architecture and storage
 
-Screens → storage facade → repository/domain rules → schema manager → storage engine → AsyncStorage. Schema remains v8. Migration backups and malformed-data safeguards remain in place. The new undo journal restores interrupted multi-key writes before allowing reads. All production mutations use one repository instance; separate concurrent repository writers are not supported.
+Screens → storage facade → repository/domain rules → schema manager → storage engine → AsyncStorage. Schema is now v9. Migration backups and malformed-data safeguards remain in place. The new undo journal restores interrupted multi-key writes before allowing reads. All production mutations use one repository instance; separate concurrent repository writers are not supported.
 
 Native media is copied into the app documents directory. CRUX-owned photo URIs resolve against the current documents directory if iOS relocates its container. Diagnostic tests refuse to reuse an active session and report cleanup errors as failures.

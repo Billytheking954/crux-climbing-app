@@ -58,7 +58,7 @@ async function testGradeAndInvariantRules() {
   assert(rejected, 'Send with one attempt must be rejected.');
 }
 
-async function testSchemaV8Migration() {
+async function testSchemaV9Migration() {
   const { CruxRepository } = require(path.join(root, 'data', 'repositories', 'crux-repository.ts'));
   const startedAt = '2026-08-31T18:00:00.000Z';
   const seed = {
@@ -75,8 +75,8 @@ async function testSchemaV8Migration() {
   const engine = createMemoryStorage(seed);
   const repo = new CruxRepository(engine);
   const snapshot = await repo.getSnapshot();
-  assert(engine._store.get('crux_storage_schema_version') === '8', 'Storage must migrate to schema v8.');
-  for (const version of [5, 6, 7, 8]) assert(engine._store.has(`crux_storage_backup_before_v${version}`), `Migration backup v${version} should exist.`);
+  assert(engine._store.get('crux_storage_schema_version') === '9', 'Storage must migrate to schema v9.');
+  for (const version of [5, 6, 7, 8, 9]) assert(engine._store.has(`crux_storage_backup_before_v${version}`), `Migration backup v${version} should exist.`);
   const [flash, send, , missing] = snapshot.sessions[0].boulders;
   assert(flash.attempts === 1 && flash.projectId === undefined, 'Legacy Flash should normalize and lose invalid project link.');
   assert(send.attempts === 2, 'Legacy Send should normalize to at least two attempts.');
@@ -89,7 +89,7 @@ async function testSchemaV8Migration() {
 
 async function testMalformedDataPreserved() {
   const { CruxRepository } = require(path.join(root, 'data', 'repositories', 'crux-repository.ts'));
-  const engine = createMemoryStorage({ crux_storage_schema_version: '8', crux_sessions: '{bad', crux_projects: '[]', crux_goals: '[]' });
+  const engine = createMemoryStorage({ crux_storage_schema_version: '9', crux_sessions: '{bad', crux_projects: '[]', crux_goals: '[]' });
   const repo = new CruxRepository(engine);
   let failed = false;
   try { await repo.createSession('Do not overwrite'); } catch { failed = true; }
@@ -132,7 +132,7 @@ async function testSourceBoundaries() {
   const forbiddenIds = sourceFiles.filter((file) => {
     if (file.endsWith(path.join('utils', 'id.ts'))) return false;
     const text = fs.readFileSync(file, 'utf8');
-    return /Math\.random\(\)/.test(text) && /(?:session|boulder|project|goal|photo|milestone)[-_]/i.test(text);
+    return /Math\.random\(\)/.test(text) && /(?:session|boulder|route|project|goal|photo|milestone)[-_]/i.test(text);
   });
   assert(forbiddenIds.length === 0, `Scattered ID generation found in: ${forbiddenIds.join(', ')}`);
   assert(fs.existsSync(path.join(root, 'app', 'developer-diagnostics.tsx')), 'Developer diagnostics screen is missing.');
@@ -152,7 +152,7 @@ async function testDuplicatePhotoMigration() {
 
 async function testVersionGuards() {
   const { CruxRepository } = require('../data/repositories/crux-repository.ts');
-  for (const version of ['8garbage', '-1', 'NaN', '9', '9007199254740993']) {
+  for (const version of ['8garbage', '-1', 'NaN', '10', '9007199254740993']) {
     const engine = createMemoryStorage({ crux_storage_schema_version: version, crux_sessions: '[]' });
     let failed = false;
     try { await new CruxRepository(engine).createSession('Invalid'); } catch { failed = true; }
@@ -260,6 +260,64 @@ async function testDiagnosticTruthAndIsolation() {
   for (const mode of ['success', 'cleanup', 'race', 'active']) await run(mode);
 }
 
+async function testRopeClimbing() {
+  const { CruxRepository } = require('../data/repositories/crux-repository.ts');
+  const { normalizeFrenchGrade, highestRouteGrade } = require('../domain/rope.ts');
+  const engine = createMemoryStorage({
+    crux_storage_schema_version: '8', crux_sessions: '[]', crux_projects: '[]', crux_goals: '[]',
+  });
+  const repo = new CruxRepository(engine);
+  const session = await repo.createSession('Mixed gym');
+  assert(engine._store.get('crux_storage_schema_version') === '9', 'Schema v8 must safely upgrade to v9.');
+  assert(engine._store.has('crux_storage_backup_before_v9'), 'A v8 backup must be saved before migration.');
+  assert(session.routes.length === 0, 'Migrated sessions must have an empty routes collection.');
+  assert(normalizeFrenchGrade('4') === '4', 'Standalone French grade 4 must be supported.');
+  assert(normalizeFrenchGrade(' 6A+ ') === '6a+' && normalizeFrenchGrade('V4') === null, 'French grades must be distinct from V grades.');
+
+  const boulder = await repo.addBoulderToSession(session.id, { grade: 'V3', result: 'Flash', attempts: 1 });
+  const grade4 = await repo.addRouteToSession(session.id, { discipline: 'lead', grade: '4', result: 'Attempt', attempts: 1 });
+  assert(grade4.grade === '4', 'A grade 4 route must be accepted and persisted.');
+  await repo.deleteRoute(session.id, grade4.id);
+  const tr = await repo.addRouteToSession(session.id, { discipline: 'top-rope', grade: '5c', result: 'Clean', attempts: 1, name: 'Blue wall' });
+  const lead = await repo.addRouteToSession(session.id, { discipline: 'lead', grade: '6a+', result: 'Redpoint', attempts: 3, notes: 'Rest at second bolt' });
+  assert((await repo.getSessionById(session.id)).routes.length === 2, 'Top-rope and lead must persist in one session.');
+  assert((await repo.getSessionById(session.id)).boulders[0].id === boulder.id, 'Bouldering data must remain intact.');
+  assert(highestRouteGrade((await repo.getSessionById(session.id)).routes, 'lead') === '6a+', 'Lead grades must not mix with top-rope grades.');
+
+  for (const invalid of [
+    { discipline: 'top-rope', grade: 'V4', result: 'Clean', attempts: 1 },
+    { discipline: 'lead', grade: '6a', result: 'Clean', attempts: 1 },
+    { discipline: 'top-rope', grade: '6b', result: 'Onsight', attempts: 1 },
+    { discipline: 'lead', grade: '6b', result: 'Flash', attempts: 2 },
+    { discipline: 'lead', grade: '6b', result: 'Attempt', attempts: 0 },
+  ]) {
+    let rejected = false;
+    try { await repo.addRouteToSession(session.id, invalid); } catch { rejected = true; }
+    assert(rejected, 'Invalid discipline, grade, result or attempts must be refused.');
+  }
+  const revised = await repo.updateRoute(session.id, lead.id, { discipline: 'lead', grade: '6b', result: 'Redpoint', attempts: 2 });
+  assert(revised.id === lead.id && revised.grade === '6b', 'Editing a route must preserve its identity.');
+  await repo.deleteRoute(session.id, tr.id);
+  const fresh = new CruxRepository(engine);
+  const persisted = await fresh.getSessionById(session.id);
+  assert(persisted.routes.length === 1 && persisted.routes[0].grade === '6b', 'Route changes must survive repository recreation.');
+  assert(persisted.boulders[0].id === boulder.id, 'Existing V-grade entries must remain unchanged.');
+  await fresh.finishSession(session.id);
+  let refused = false;
+  try { await fresh.addRouteToSession(session.id, { discipline: 'lead', grade: '6a', result: 'Attempt', attempts: 1 }); } catch { refused = true; }
+  assert(refused, 'A finished session must not allow new routes.');
+
+  const bad = createMemoryStorage({
+    crux_storage_schema_version: '9',
+    crux_sessions: JSON.stringify([{ id: 'invalid', gymName: 'Gym', startedAt: '2026-01-01T12:00:00Z', boulders: [],
+      routes: [{ id: 'unsafe', discipline: 'lead', grade: 'V4', result: 'Flash', attempts: 1, createdAt: '2026-01-01T12:01:00Z' }] }]),
+    crux_projects: '[]', crux_goals: '[]',
+  });
+  refused = false;
+  try { await new CruxRepository(bad).getSnapshot(); } catch { refused = true; }
+  assert(refused && bad._store.get('crux_sessions').includes('V4'), 'Malformed rope entries must be preserved, not erased.');
+}
+
 async function testPhotoPersistence() {
   const mediaPath = require.resolve('../features/media/media-processor.ts');
   const oldLoad = Module._load;
@@ -290,7 +348,8 @@ async function testPhotoPersistence() {
 
 (async () => {
   await testGradeAndInvariantRules();
-  await testSchemaV8Migration();
+  await testSchemaV9Migration();
+  await testRopeClimbing();
   await testMalformedDataPreserved();
   await testLifecycleAndConcurrency();
   await testSourceBoundaries();
@@ -298,7 +357,7 @@ async function testPhotoPersistence() {
     await test();
     console.log(`PASS ${test.name}`);
   }
-  console.log('PASS all 12 CRUX safety suites (native APIs mocked where required).');
+  console.log('PASS all 13 CRUX safety suites (native APIs mocked where required).');
 })().catch((error) => {
   console.error(error.stack || error);
   process.exit(1);
